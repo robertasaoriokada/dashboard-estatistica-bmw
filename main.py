@@ -1030,3 +1030,7 @@ if models:
         st.warning("⚠️ Nenhum dado de cor disponível com os filtros selecionados.")
 else:
     st.info("👈 Selecione pelo menos um modelo na sidebar para visualizar a análise de cores.")
+
+st.markdown("---")
+st.header("🎲 DATABASE CRUA")
+st.dataframe(df, width='stretch')
