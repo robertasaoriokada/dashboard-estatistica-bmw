@@ -5,7 +5,6 @@ import copy
 import json
 import numpy as np
 
-#alter the theme of the page into a dark theme
 st.markdown("""
     <style>
     .reportview-container {
@@ -29,7 +28,6 @@ st.set_page_config(
 )
 
 
-# alt.themes.enable("dark")
 
 cols = st.columns(2)
 
@@ -64,7 +62,6 @@ df_region = pd.read_csv('dados/df_region.csv')
 regions = np.sort(df_region["Region"].unique())
 
 with top_left_cell:
-    # Multi-select for picking multiple regions
     selected_regions = st.multiselect(
         "Regiões",
         options=regions,
@@ -75,7 +72,6 @@ with top_left_cell:
 df_transmission = pd.read_csv('dados/df_transmission.csv')
 transmission_types = df_transmission['Transmission'].unique()
 with top_left_cell:
-    # Multi-select for picking multiple transmission types
     selected_transmissions = st.multiselect(
         "Tipo de Transmissão",
         options=transmission_types,
@@ -87,7 +83,6 @@ with top_left_cell:
 df_sales_classification = pd.read_csv('dados/df_sales_classification.csv')
 sales_classifications = df_sales_classification['Sales_Classification'].unique()
 with top_left_cell:
-    # Multi-select for picking multiple sales classifications
     selected_sales_classifications = st.multiselect(
         "Classificação de Vendas",
         options=sales_classifications,
@@ -169,7 +164,6 @@ with cols[0]:
     st.subheader("Volume de vendas ao ano por modelo")
     if models:
         filtered_df = df[df['Model'].isin(models)].copy()
-        # Filter data for selected models
         filtered_df = calcular_metricas(filtered_df, models, selected_regions, selected_transmissions, selected_sales_classifications)
         if not filtered_df.empty:
             # Group by Model and Year to get total sales volume for better visualization
@@ -194,11 +188,8 @@ with cols[1]:
     st.subheader("Variação anual do preço médio por modelo")
     if models:
         filtered_df = df[df['Model'].isin(models)].copy()
-        # Filter data for selected models
         filtered_df = calcular_metricas(filtered_df, models, selected_regions, selected_transmissions, selected_sales_classifications)
         if not filtered_df.empty:
-            # Use raw data for boxplot to show actual price distribution
-            # Don't aggregate the data - boxplot needs individual data points
             
             chart = alt.Chart(filtered_df).mark_boxplot(size=50).encode(
                 x=alt.X('Model:N', title='Modelo', axis=alt.Axis(labelAngle=-45)),
@@ -217,7 +208,6 @@ with cols[1]:
 
 cols = st.columns(4)
 
-#Métricas principais em 4 colunas organizadas
 modelo_de_maior_preco = cols[0].container(
     border=True, height="stretch", vertical_alignment="center"
 )
@@ -235,7 +225,6 @@ modelo_de_menor_variancia_de_preco_por_ano = cols[3].container(
 )
 
 
-# Adicionando uma nova linha para a métrica de participação de mercado
 cols_segunda_linha = st.columns(4)
 modelo_de_maior_participacao_de_mercado = cols_segunda_linha[0].container(
     border=True, height="stretch", vertical_alignment="center"
@@ -345,7 +334,6 @@ with ano_de_maior_faturamento:
     if models:
         filtered_df = calcular_metricas(filtered_df, models, selected_regions, selected_transmissions, selected_sales_classifications)
         if not filtered_df.empty:
-            # Calculate revenue for this container
             filtered_df['Revenue'] = filtered_df['Price_USD'] * filtered_df['Sales_Volume']
             revenue_year = filtered_df.groupby('Year')['Revenue'].sum().reset_index()
             revenue_year = revenue_year.sort_values(by='Revenue', ascending=False)
@@ -388,10 +376,8 @@ if selected_years and models:
         region_filtered_df = region_filtered_df[region_filtered_df['Sales_Classification'].isin(sales_classification_ids)].copy()
 
     if not region_filtered_df.empty:
-        # Merge with region names
         region_data = region_filtered_df.merge(df_region, left_on='Region', right_on='Id', how='left')
         
-        # Calculate metrics by region
         region_metrics = region_data.groupby('Region_y').agg({
             'Sales_Volume': 'sum',
             'Price_USD': 'mean'
@@ -402,7 +388,6 @@ if selected_years and models:
         col1, col2 = st.columns(2)
         
         with col1:
-            # Bar chart for volume by region
             volume_chart = alt.Chart(region_metrics).mark_bar().encode(
                 x=alt.X('Volume_Total:Q', title='Volume de Vendas'),
                 y=alt.Y('Região:N', sort='-x', title='Região'),
@@ -415,7 +400,6 @@ if selected_years and models:
             st.altair_chart(volume_chart, use_container_width=True)
         
         with col2:
-            # Metrics table
             st.write("**Resumo por Região:**")
             region_metrics['Volume_Total'] = region_metrics['Volume_Total'].apply(lambda x: f"{x:,}")
             region_metrics['Preço_Médio'] = region_metrics['Preço_Médio'].apply(lambda x: f"${x:,.0f}")
@@ -452,7 +436,6 @@ if selected_years and models:
         # Merge with region names for analysis
         regional_analysis = region_filtered_df.merge(df_region, left_on='Region', right_on='Id', how='left')
         
-        # Calculate comprehensive regional metrics
         regional_summary = regional_analysis.groupby('Region_y').agg({
             'Sales_Volume': ['sum', 'mean'],
             'Price_USD': ['mean', 'std'],
@@ -463,7 +446,6 @@ if selected_years and models:
         regional_summary = regional_summary.reset_index()
         regional_summary['Market_Share_%'] = (regional_summary['Volume_Total'] / regional_summary['Volume_Total'].sum() * 100).round(1)
         
-        # Key regional insights
         top_region = regional_summary.loc[regional_summary['Volume_Total'].idxmax()]
         most_expensive_region = regional_summary.loc[regional_summary['Preço_Médio'].idxmax()]
         most_diverse_region = regional_summary.loc[regional_summary['Qtd_Modelos'].idxmax()]
@@ -497,13 +479,11 @@ if selected_years and models:
             - Base para novos lançamentos
             """)
         
-        # Market concentration analysis
         st.subheader("📊 Análise de Concentração de Mercado")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Market share pie chart
             market_share_chart = alt.Chart(regional_summary).mark_arc(innerRadius=50).encode(
                 theta=alt.Theta('Volume_Total:Q'),
                 color=alt.Color('Region_y:N', scale=alt.Scale(scheme='category10'), title='Região'),
@@ -517,7 +497,6 @@ if selected_years and models:
             st.altair_chart(market_share_chart, use_container_width=True)
         
         with col2:
-            # Price vs Volume scatter
             bubble_chart = alt.Chart(regional_summary).mark_circle(opacity=0.7).encode(
                 x=alt.X('Preço_Médio:Q', title='Preço Médio (USD)'),
                 y=alt.Y('Volume_Total:Q', title='Volume Total'),
@@ -538,7 +517,6 @@ st.markdown("---")
 st.subheader("📊 Análise Completa de Correlações entre Variáveis")
 
 if models:
-    # Filter data for correlation analysis
     correlation_df = df[df['Model'].isin(models)].copy()
     
     if selected_regions:
@@ -561,7 +539,6 @@ if models:
         numeric_vars = ['Price_USD', 'Sales_Volume', 'Engine_Size_L', 'Mileage_KM', 'Year']
         corr_data = correlation_df[numeric_vars].copy()
         
-        # Calculate correlation matrix
         correlation_matrix = corr_data.corr()
         
         col1, col2 = st.columns(2)
@@ -704,14 +681,11 @@ if selected_years:
     analysis_df = analysis_df[analysis_df['Year'].isin(selected_years)].copy()
 
 
-# Merge with fuel type names
 fuel_analysis = analysis_df.merge(df_fuel_type, left_on='Fuel_Type', right_on='Id', how='left')
 
 if not fuel_analysis.empty:
-    # Key Metrics Row
     st.subheader("📊 Métricas Principais por Tipo de Combustível")
     
-    # Calculate key metrics
     fuel_metrics = fuel_analysis.groupby('Fuel_Type_y').agg({
         'Sales_Volume': 'sum',
         'Price_USD': 'mean',
@@ -729,13 +703,11 @@ if not fuel_analysis.empty:
                 delta=f"${row['Preço_Médio']:,.0f} médio"
             )
     
-    # Main Analysis Section
     col1, col2 = st.columns(2)
     
     with col1:
         st.subheader("📈 Evolução do Volume de Vendas")
         
-        # Sales volume evolution
         sales_evolution = fuel_analysis.groupby(['Year', 'Fuel_Type_y'])['Sales_Volume'].sum().reset_index()
         
         sales_chart = alt.Chart(sales_evolution).mark_line(point=True, strokeWidth=3).encode(
@@ -752,10 +724,8 @@ if not fuel_analysis.empty:
         
         st.altair_chart(sales_chart, use_container_width=True)
         
-        # Market share analysis
         st.subheader("🥧 Participação de Mercado")
         
-        # Calculate market share by fuel type
         market_share = fuel_analysis.groupby('Fuel_Type_y')['Sales_Volume'].sum().reset_index()
         market_share['Percentage'] = (market_share['Sales_Volume'] / market_share['Sales_Volume'].sum() * 100).round(1)
         
@@ -777,7 +747,6 @@ if not fuel_analysis.empty:
     with col2:
         st.subheader("💰 Evolução dos Preços Médios")
         
-        # Price evolution
         price_evolution = fuel_analysis.groupby(['Year', 'Fuel_Type_y'])['Price_USD'].mean().reset_index()
         
         price_chart = alt.Chart(price_evolution).mark_line(point=True, strokeWidth=3).encode(
@@ -794,10 +763,8 @@ if not fuel_analysis.empty:
         
         st.altair_chart(price_chart, use_container_width=True)
         
-        # Price vs Volume correlation
         st.subheader("📊 Preço vs Volume (Elasticidade)")
         
-        # Aggregate data for correlation
         correlation_data = fuel_analysis.groupby(['Year', 'Fuel_Type_y']).agg({
             'Price_USD': 'mean',
             'Sales_Volume': 'sum'
@@ -820,7 +787,6 @@ if not fuel_analysis.empty:
         
         st.altair_chart(scatter_chart, use_container_width=True)
     
-    # Strategic Insights Section
     st.markdown("---")
     st.subheader("🎯 Insights Estratégicos")
     
@@ -838,7 +804,6 @@ if not fuel_analysis.empty:
         'Price_USD': 'mean'
     })
     
-    # Growth analysis
     if not previous_data.empty and not latest_data.empty:
         growth_analysis = ((latest_data - previous_data) / previous_data * 100).round(1)
     else:
@@ -878,11 +843,9 @@ else:
 st.markdown("---")
 st.header("🎨 Análise Detalhada: Cores dos Veículos BMW")
 
-# Create comprehensive analysis with applied filters
 if models:
     color_filtered_df = df[df['Model'].isin(models)].copy()
     
-    # Apply all filters
     if selected_regions:
         region_ids = df_region[df_region['Region'].isin(selected_regions)]['Id'].tolist()
         color_filtered_df = color_filtered_df[color_filtered_df['Region'].isin(region_ids)].copy()
@@ -962,13 +925,11 @@ if models:
                 f"Liderança: {top_color['Color_y']}"
             )
         
-        # Detailed analysis charts
         st.subheader("📈 Análise Comparativa por Cor")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Volume comparison chart
             volume_chart = alt.Chart(color_metrics).mark_bar().encode(
                 x=alt.X('Volume_Total:Q', title='Volume Total de Vendas'),
                 y=alt.Y('Color_y:N', sort='-x', title='Cor'),
@@ -985,7 +946,6 @@ if models:
             st.altair_chart(volume_chart, use_container_width=True)
         
         with col2:
-            # Price comparison chart
             price_chart = alt.Chart(color_metrics).mark_bar().encode(
                 x=alt.X('Preço_Médio:Q', title='Preço Médio (USD)'),
                 y=alt.Y('Color_y:N', sort='-x', title='Cor'),
@@ -1002,10 +962,8 @@ if models:
             )
             st.altair_chart(price_chart, use_container_width=True)
         
-        # Detailed table
         st.subheader("📋 Tabela Detalhada por Cor")
         
-        # Format table for display
         display_color_metrics = color_metrics.copy()
         display_color_metrics['Volume_Total'] = display_color_metrics['Volume_Total'].apply(lambda x: f"{x:,.0f}")
         display_color_metrics['Preço_Médio'] = display_color_metrics['Preço_Médio'].apply(lambda x: f"${x:,.0f}")
@@ -1020,10 +978,8 @@ if models:
         
         st.dataframe(display_color_metrics, width='stretch')
         
-        # Business insights
         st.subheader("💡 Insights de Negócio")
         
-        # Calculate additional insights
         total_colors = len(color_metrics)
         top_3_colors = color_metrics.head(3)
         top_3_share = top_3_colors['Participação_%'].sum()
@@ -1038,7 +994,6 @@ if models:
             - Cor líder ({top_color['Color_y']}) domina **{leader_percentage:.1f}%**
             """)
             
-            # Price range analysis
             price_range = most_expensive_color['Preço_Médio'] - color_metrics['Preço_Médio'].min()
             st.success(f"""
             **💰 Estratégia de Preços:**
@@ -1048,7 +1003,6 @@ if models:
             """)
         
         with insight_col2:
-            # Volume vs Price correlation
             volume_leader = top_color['Color_y']
             price_leader = most_expensive_color['Color_y']
             
@@ -1064,7 +1018,6 @@ if models:
             - Potencial de crescimento em cores premium
             """)
             
-            # Recommendation
             least_sold_color = color_metrics.iloc[-1]['Color_y']
             st.error(f"""
             **⚠️ Atenção Estratégica:**
