@@ -518,73 +518,69 @@ st.subheader("📊 Análise Completa de Correlações entre Variáveis")
 
 if models:
     correlation_df = df[df['Model'].isin(models)].copy()
-    
+
     if selected_regions:
         region_ids = df_region[df_region['Region'].isin(selected_regions)]['Id'].tolist()
         correlation_df = correlation_df[correlation_df['Region'].isin(region_ids)].copy()
-    
+
     if selected_transmissions:
         transmission_ids = df_transmission[df_transmission['Transmission'].isin(selected_transmissions)]['Id'].tolist()
         correlation_df = correlation_df[correlation_df['Transmission'].isin(transmission_ids)].copy()
-    
+
     if selected_sales_classifications:
         sales_classification_ids = df_sales_classification[df_sales_classification['Sales_Classification'].isin(selected_sales_classifications)]['Id'].tolist()
         correlation_df = correlation_df[correlation_df['Sales_Classification'].isin(sales_classification_ids)].copy()
-    
+
     if selected_years:
         correlation_df = correlation_df[correlation_df['Year'].isin(selected_years)].copy()
 
-    if not correlation_df.empty and len(correlation_df) > 2:
-        # Select numerical variables for correlation analysis
-        numeric_vars = ['Price_USD', 'Sales_Volume', 'Engine_Size_L', 'Mileage_KM', 'Year']
-        corr_data = correlation_df[numeric_vars].copy()
-        
-        correlation_matrix = corr_data.corr()
-        
+    numeric_vars = ['Price_USD', 'Sales_Volume', 'Engine_Size_L', 'Mileage_KM', 'Year']
+    corr_data = correlation_df[numeric_vars].replace([np.inf, -np.inf], np.nan).dropna()
+
+    for col in ['Mileage_KM', 'Price_USD']:
+        q_low = corr_data[col].quantile(0.01)
+        q_high = corr_data[col].quantile(0.99)
+        corr_data = corr_data[(corr_data[col] >= q_low) & (corr_data[col] <= q_high)]
+
+    if not corr_data.empty and len(corr_data) > 2:
+        # Pearson correlation
+        correlation_matrix = corr_data.corr(method='pearson')
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.write("**📈 Matriz de Correlação - Heatmap**")
-            
-            # Prepare data for heatmap
+            st.write("**📈 Matriz de Correlação de Pearson - Heatmap**")
             corr_melted = correlation_matrix.reset_index().melt('index')
             corr_melted.columns = ['Variable_1', 'Variable_2', 'Correlation']
-            
-            # Create heatmap
+
             heatmap = alt.Chart(corr_melted).mark_rect().encode(
                 x=alt.X('Variable_1:O', title='Variáveis'),
                 y=alt.Y('Variable_2:O', title='Variáveis'),
-                color=alt.Color('Correlation:Q', 
-                              scale=alt.Scale(scheme='redblue', domain=[-1, 1]),
-                              title='Correlação'),
+                color=alt.Color('Correlation:Q', scale=alt.Scale(scheme='redblue', domain=[-1, 1]), title='Correlação'),
                 tooltip=['Variable_1:O', 'Variable_2:O', 'Correlation:Q']
             ).properties(
-                title='Matriz de Correlação entre Variáveis',
+                title='Matriz de Correlação (Pearson)',
                 width=350,
                 height=350
             )
-            
-            # Add text labels
+
             text = alt.Chart(corr_melted).mark_text(baseline='middle', fontSize=10).encode(
                 x=alt.X('Variable_1:O'),
                 y=alt.Y('Variable_2:O'),
                 text=alt.Text('Correlation:Q', format='.2f'),
                 color=alt.condition(alt.datum.Correlation > 0.5, alt.value('white'), alt.value('black'))
             )
-            
+
             st.altair_chart(heatmap + text, use_container_width=True)
-        
+
         with col2:
             st.write("**🔍 Correlações Significativas (|r| ≥ 0.3)**")
-            
-            # Find strong correlations
             strong_correlations = []
             for i in range(len(correlation_matrix.columns)):
                 for j in range(i+1, len(correlation_matrix.columns)):
                     var1 = correlation_matrix.columns[i]
                     var2 = correlation_matrix.columns[j]
                     corr_value = correlation_matrix.iloc[i, j]
-                    
                     if abs(corr_value) >= 0.3:
                         strong_correlations.append({
                             'Variável 1': var1.replace('_', ' '),
@@ -593,61 +589,97 @@ if models:
                             'Força': 'Forte' if abs(corr_value) >= 0.7 else 'Moderada',
                             'Direção': 'Positiva' if corr_value > 0 else 'Negativa'
                         })
-            
+
             if strong_correlations:
                 corr_df = pd.DataFrame(strong_correlations)
                 corr_df = corr_df.sort_values('Correlação', key=abs, ascending=False)
-                
-                # Format for display
                 display_corr = corr_df.copy()
                 display_corr['Correlação'] = display_corr['Correlação'].apply(lambda x: f"{x:.3f}")
-                
                 st.dataframe(display_corr, width='stretch')
-                
-                # Business insights
+
                 st.write("**💡 Insights de Negócio:**")
-                
                 for _, row in corr_df.iterrows():
                     var1 = row['Variável 1']
                     var2 = row['Variável 2']
                     corr = row['Correlação']
-                    
-                    if 'Price' in var1 or 'Price' in var2:
+                    if ('Mileage' in var1 or 'Mileage' in var2) and ('Price' in var1 or 'Price' in var2):
+                        if corr < 0:
+                            st.warning(f"🚗 **Quilometragem vs Preço:** Carros com maior quilometragem tendem a valer menos ({corr:.3f})")
+                        else:
+                            st.info(f"🚗 **Quilometragem vs Preço:** Relação positiva inesperada ({corr:.3f})")
+                    elif 'Price' in var1 or 'Price' in var2:
                         if 'Engine' in var1 or 'Engine' in var2:
                             if corr > 0:
-                                st.info(f"💰 **Preço vs Tamanho Motor:** Motores maiores = preços mais altos ({corr:.3f})")
+                                st.info(f"💰 **Preço vs Motor:** Motores maiores = preços mais altos ({corr:.3f})")
                         elif 'Sales' in var1 or 'Sales' in var2:
                             if corr < 0:
                                 st.warning(f"📉 **Preço vs Vendas:** Preços altos reduzem volume de vendas ({corr:.3f})")
                             else:
                                 st.success(f"📈 **Preço vs Vendas:** Preços premium impulsionam vendas ({corr:.3f})")
-                        elif 'Mileage' in var1 or 'Mileage' in var2:
-                            if corr < 0:
-                                st.info(f"🚗 **Preço vs Quilometragem:** Maior uso reduz valor de revenda ({corr:.3f})")
-                    
                     elif 'Engine' in var1 or 'Engine' in var2:
                         if 'Sales' in var1 or 'Sales' in var2:
                             if corr > 0:
                                 st.success(f"🔧 **Motor vs Vendas:** Motores potentes vendem mais ({corr:.3f})")
                             else:
                                 st.warning(f"⚡ **Motor vs Vendas:** Preferência por motores menores ({corr:.3f})")
-                
-                # Summary statistics
+
                 st.write("**📊 Resumo Estatístico:**")
                 avg_corr = np.mean([abs(c['Correlação']) for c in strong_correlations])
                 max_corr = max([abs(c['Correlação']) for c in strong_correlations])
-                
                 st.metric("Correlação Média", f"{avg_corr:.3f}")
                 st.metric("Correlação Máxima", f"{max_corr:.3f}")
-                
+
+                # Gráfico específico: Preço vs Quilometragem
+                st.write("**📉 Relação Preço vs Quilometragem**")
+                scatter = alt.Chart(corr_data).mark_circle(size=60, opacity=0.6).encode(
+                    x=alt.X('Mileage_KM:Q', title='Quilometragem (KM)'),
+                    y=alt.Y('Price_USD:Q', title='Preço (USD)', scale=alt.Scale(zero=False)),
+                    tooltip=[alt.Tooltip('Mileage_KM:Q', format=',.0f'), alt.Tooltip('Price_USD:Q', format=',.0f')]
+                ).properties(
+                    title='Preço vs Quilometragem',
+                    height=300
+                )
+                st.altair_chart(scatter, use_container_width=True)
             else:
                 st.info("Nenhuma correlação significativa encontrada (|r| ≥ 0.3)")
-                
     else:
         st.warning("Dados insuficientes para análise de correlação completa.")
-else:
-    st.info("Selecione pelo menos um modelo para análise de correlação.")
-
+        st.markdown("---")
+        st.subheader("🔎 Prova de Ausência de Correlação entre Preço e Quilometragem")
+        if not corr_data.empty and 'Price_USD' in corr_data.columns and 'Mileage_KM' in corr_data.columns:
+            corr_value = corr_data['Price_USD'].corr(corr_data['Mileage_KM'], method='pearson')
+            st.write(f"**Coeficiente de correlação de Pearson entre Preço e Quilometragem:** `{corr_value:.3f}`")
+            if abs(corr_value) < 0.3:
+                st.success("Não existe correlação significativa entre preço e quilometragem dos carros BMW analisados (|r| < 0.3).")
+            else:
+                st.warning("Existe correlação significativa entre preço e quilometragem (|r| ≥ 0.3).")
+            st.write("**Gráfico de dispersão com linha de tendência linear:**")
+            scatter = alt.Chart(corr_data).mark_circle(size=60, opacity=0.5).encode(
+                x=alt.X('Mileage_KM:Q', title='Quilometragem (KM)'),
+                y=alt.Y('Price_USD:Q', title='Preço (USD)', scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip('Mileage_KM:Q', format=',.0f'), alt.Tooltip('Price_USD:Q', format=',.0f')]
+            )
+            regression = alt.Chart(corr_data).transform_regression(
+                'Mileage_KM', 'Price_USD'
+            ).mark_line(color='red', strokeDash=[5,5]).encode(
+                x='Mileage_KM:Q',
+                y='Price_USD:Q'
+            )
+            st.altair_chart(scatter + regression, use_container_width=True)
+            st.caption("A linha de tendência é praticamente horizontal, reforçando a ausência de relação linear entre preço e quilometragem.")
+            st.write("**Boxplot do preço por faixas de quilometragem:**")
+            corr_data['Faixa_KM'] = pd.cut(corr_data['Mileage_KM'], bins=5)
+            boxplot = alt.Chart(corr_data).mark_boxplot(size=40).encode(
+                x=alt.X('Faixa_KM:N', title='Faixa de Quilometragem'),
+                y=alt.Y('Price_USD:Q', title='Preço (USD)', scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip('Faixa_KM:N'), alt.Tooltip('Price_USD:Q', format=',.0f')]
+            ).properties(
+                height=250
+            )
+            st.altair_chart(boxplot, use_container_width=True)
+            st.caption("Os preços médios permanecem semelhantes entre as faixas de quilometragem, reforçando a ausência de correlação.")
+        else:
+            st.info("Dados insuficientes para provar ausência de correlação entre preço e quilometragem.")
 
 # Load fuel type data
 df_fuel_types = pd.read_csv('dados/df_fuel_type.csv')
