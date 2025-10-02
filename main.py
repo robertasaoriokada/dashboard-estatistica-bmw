@@ -1033,4 +1033,11 @@ else:
 
 st.markdown("---")
 st.header("🎲 DATABASE CRUA")
+# Usando os outros arquivos csv para fazer o merge e mostrar os nomes ao invés do id
+df = df.merge(df_region, left_on='Region', right_on='Id', how='left', suffixes=('', '_region'))
+df = df.merge(df_transmission, left_on='Transmission', right_on='Id', how='left', suffixes=('', '_transmission'))
+df = df.merge(df_sales_classification, left_on='Sales_Classification', right_on='Id', how='left', suffixes=('', '_sales'))
+df = df.merge(df_color, left_on='Color', right_on='Id', how='left', suffixes=('', '_color'))
+df = df.merge(df_fuel_type, left_on='Fuel_Type', right_on='Id', how='left', suffixes=('', '_fuel'))
+
 st.dataframe(df, width='stretch')
